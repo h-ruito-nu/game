@@ -11,6 +11,7 @@ AI物語ミックス
 import random
 import tkinter as tk
 
+from audio import AudioManager
 from tales import NAMES, TALES
 
 
@@ -139,6 +140,21 @@ class StoryGame:
         self.root.title("AI物語ミックス")
         self.root.geometry("760x700")
         self.root.minsize(620, 600)
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.colors = {
+            "background": "#fff8e7",
+            "title": "#7b3f00",
+            "text": "#4b3832",
+            "panel": "#fffdf5",
+            "border": "#e6c98a",
+            "button": "#f4b183",
+            "button_active": "#ffd1a9",
+            "card": "#fff1c1",
+            "card_active": "#ffe49a",
+            "selected": "#9ad7ff",
+            "correct": "#ffd966",
+        }
+        root.configure(bg=self.colors["background"])
         self.rounds = 3
         self.round_no = 0
         self.total = 0
@@ -146,16 +162,32 @@ class StoryGame:
         self.b_name = ""
         self.hints = []
         self.used_hints = 0
+        self.audio = AudioManager()
+        self.selected_names = set()
+        self.choice_cards = {}
 
-        tk.Label(root, text="AI物語ミックス", font=("Yu Gothic UI", 22, "bold")).pack(
+        tk.Label(
+            root,
+            text="AI物語ミックス",
+            font=("Yu Gothic UI", 22, "bold"),
+            fg=self.colors["title"],
+            bg=self.colors["background"],
+        ).pack(
             pady=(15, 2)
         )
         tk.Label(
             root,
             text="2つのジャンルと2つの昔話を混ぜた物語から、昔話を2つ当ててください",
             font=("Yu Gothic UI", 11),
+            fg=self.colors["text"],
+            bg=self.colors["background"],
         ).pack()
-        self.round_label = tk.Label(root, font=("Yu Gothic UI", 13, "bold"))
+        self.round_label = tk.Label(
+            root,
+            font=("Yu Gothic UI", 13, "bold"),
+            fg=self.colors["title"],
+            bg=self.colors["background"],
+        )
         self.round_label.pack(pady=(14, 5))
         self.story_text = tk.Text(
             root,
@@ -165,36 +197,89 @@ class StoryGame:
             padx=10,
             pady=8,
             state="disabled",
+            bg=self.colors["panel"],
+            fg=self.colors["text"],
+            relief="solid",
+            borderwidth=1,
         )
         self.story_text.pack(fill="both", expand=True, padx=25)
         tk.Label(
-            root, text="混ざっている昔話を2つ選択", font=("Yu Gothic UI", 11, "bold")
-        ).pack(pady=(12, 3))
-        self.choices = tk.Listbox(
             root,
-            selectmode=tk.MULTIPLE,
-            height=len(NAMES),
-            exportselection=False,
-            font=("Yu Gothic UI", 11),
+            text="混ざっている昔話を2つ選択",
+            font=("Yu Gothic UI", 11, "bold"),
+            fg=self.colors["text"],
+            bg=self.colors["background"],
+        ).pack(pady=(12, 3))
+        self.cards_frame = tk.Frame(
+            root,
+            bg=self.colors["background"],
+            highlightbackground=self.colors["border"],
+            highlightthickness=1,
         )
-        for name in NAMES:
-            self.choices.insert(tk.END, name)
-        self.choices.pack()
-        self.status_label = tk.Label(root, text="", font=("Yu Gothic UI", 11), wraplength=700)
+        self.cards_frame.pack(padx=25, pady=5)
+        for index, name in enumerate(NAMES):
+            card = tk.Button(
+                self.cards_frame,
+                text=name,
+                width=15,
+                height=2,
+                font=("Yu Gothic UI", 11, "bold"),
+                bg=self.colors["card"],
+                fg=self.colors["text"],
+                activebackground=self.colors["card_active"],
+                activeforeground=self.colors["text"],
+                relief="raised",
+                borderwidth=2,
+                command=lambda selected_name=name: self.toggle_card(selected_name),
+            )
+            card.grid(row=index // 4, column=index % 4, padx=5, pady=5)
+            self.choice_cards[name] = card
+        self.status_label = tk.Label(
+            root,
+            text="",
+            font=("Yu Gothic UI", 11),
+            wraplength=700,
+            fg=self.colors["text"],
+            bg=self.colors["background"],
+        )
         self.status_label.pack(pady=8)
-        buttons = tk.Frame(root)
+        buttons = tk.Frame(root, bg=self.colors["background"])
         buttons.pack()
-        self.answer_button = tk.Button(buttons, text="答え合わせ", width=13, command=self.check_answer)
+        button_options = {
+            "width": 13,
+            "font": ("Yu Gothic UI", 10, "bold"),
+            "bg": self.colors["button"],
+            "fg": self.colors["text"],
+            "activebackground": self.colors["button_active"],
+            "activeforeground": self.colors["text"],
+            "relief": "raised",
+            "borderwidth": 2,
+        }
+        self.answer_button = tk.Button(
+            buttons, text="答え合わせ", command=self.check_answer, **button_options
+        )
         self.answer_button.pack(side="left", padx=4)
-        self.hint_button = tk.Button(buttons, text="ヒントを見る", width=13, command=self.show_hint)
+        self.hint_button = tk.Button(
+            buttons, text="ヒントを見る", command=self.show_hint, **button_options
+        )
         self.hint_button.pack(side="left", padx=4)
-        self.give_up_button = tk.Button(buttons, text="降参", width=13, command=self.give_up)
+        self.give_up_button = tk.Button(
+            buttons, text="降参", command=self.give_up, **button_options
+        )
         self.give_up_button.pack(side="left", padx=4)
         self.next_button = tk.Button(
-            buttons, text="次の問題", width=13, command=self.next_round, state="disabled"
+            buttons,
+            text="次の問題",
+            command=self.next_round,
+            state="disabled",
+            **button_options,
         )
         self.next_button.pack(side="left", padx=4)
         self.next_round()
+
+    def close(self):
+        self.audio.close()
+        self.root.destroy()
 
     def set_story(self, story):
         self.story_text.config(state="normal")
@@ -202,25 +287,60 @@ class StoryGame:
         self.story_text.insert("1.0", story)
         self.story_text.config(state="disabled")
 
+    def toggle_card(self, name):
+        if name in self.selected_names:
+            self.selected_names.remove(name)
+        elif len(self.selected_names) < 2:
+            self.selected_names.add(name)
+            self.audio.play("select")
+        self.update_card_colors()
+
+    def update_card_colors(self, correct=False):
+        for name, card in self.choice_cards.items():
+            if correct and name in {self.a_name, self.b_name}:
+                card.config(
+                    bg=self.colors["correct"],
+                    activebackground="#fff2a8",
+                    relief="sunken",
+                )
+            elif name in self.selected_names:
+                card.config(
+                    bg=self.colors["selected"],
+                    activebackground="#c9ecff",
+                    relief="sunken",
+                )
+            else:
+                card.config(
+                    bg=self.colors["card"],
+                    activebackground=self.colors["card_active"],
+                    relief="raised",
+                )
+
+    def set_cards_state(self, state):
+        for card in self.choice_cards.values():
+            card.config(state=state)
+
     def next_round(self):
         if self.round_no >= self.rounds:
+            self.audio.play("finish")
             self.round_label.config(text=f"ゲーム終了　{self.total} / {self.rounds * 10}点")
             self.set_story("おつかれさまでした！")
             self.status_label.config(text="全問終了です。")
             for button in (self.answer_button, self.hint_button, self.give_up_button):
                 button.config(state="disabled")
             self.next_button.config(state="disabled")
-            self.choices.config(state="disabled")
+            self.set_cards_state("disabled")
             return
         self.round_no += 1
         self.a_name, self.b_name = random.sample(NAMES, 2)
         first_genre, second_genre = random.sample(GENRE_NAMES, 2)
         self.hints = make_hints(self.a_name, self.b_name)
         self.used_hints = 0
+        self.selected_names.clear()
         self.round_label.config(text=f"第{self.round_no}問　（得点: {self.total}点）")
         self.set_story(make_story(self.a_name, self.b_name, first_genre, second_genre))
-        self.choices.config(state="normal")
-        self.choices.selection_clear(0, tk.END)
+        self.update_card_colors()
+        self.set_cards_state("normal")
         self.status_label.config(text="昔話を2つ選んでください。")
         self.answer_button.config(state="normal")
         self.hint_button.config(state="normal")
@@ -234,28 +354,34 @@ class StoryGame:
         self.next_button.config(
             state="normal", text="結果を見る" if self.round_no == self.rounds else "次の問題"
         )
-        self.choices.config(state="disabled")
+        self.set_cards_state("disabled")
 
     def check_answer(self):
-        selected = {self.choices.get(i) for i in self.choices.curselection()}
+        selected = self.selected_names
         if len(selected) != 2:
             self.status_label.config(text="昔話を2つ選択してください。")
             return
         if selected != {self.a_name, self.b_name}:
+            self.audio.play("wrong")
             self.status_label.config(text="ざんねん、ちがいます。もう一度選んでください。")
             return
         point = max(1, 10 - 3 * self.used_hints)
         self.total += point
+        self.audio.play("correct")
+        self.update_card_colors(correct=True)
         self.finish_round(f"正解！ +{point}点　元ネタは「{self.a_name}」と「{self.b_name}」でした。")
 
     def show_hint(self):
         if self.used_hints < len(self.hints):
+            self.audio.play("hint")
             self.status_label.config(text=self.hints[self.used_hints])
             self.used_hints += 1
         else:
+            self.audio.play("wrong")
             self.status_label.config(text="ヒントはもうありません。")
 
     def give_up(self):
+        self.audio.play("give_up")
         self.finish_round(f"正解は「{self.a_name}」と「{self.b_name}」でした。 +0点")
 
 
