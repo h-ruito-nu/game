@@ -11,7 +11,7 @@ AI物語ミックス
 import random
 import tkinter as tk
 
-from game import NAMES, TALES
+from tales import NAMES, TALES
 
 
 GENRES = {
