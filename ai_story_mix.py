@@ -89,21 +89,6 @@ GENRES = {
 
 GENRE_NAMES = list(GENRES)
 
-DIFFICULTY_CLUE_COUNTS = {
-    "初級": 3,
-    "中級": 2,
-    "上級": 1,
-}
-
-OBSCURED_CLUES = {
-    "hero": "ひとりの人物",
-    "helper": "不思議な仲間",
-    "item": "ある品物",
-    "place": "ある場所",
-    "event": "思いがけない出来事が起きた",
-    "ending": "不思議な結末を迎えた",
-}
-
 
 def make_original_story(first_genre, second_genre):
     """2つのジャンル素材から、昔話の部品を混ぜる土台を作る。"""
@@ -122,25 +107,14 @@ def make_original_story(first_genre, second_genre):
     ]
 
 
-def _story_clues(tale, fields, difficulty):
-    clue_count = DIFFICULTY_CLUE_COUNTS[difficulty]
-    visible_fields = fields if clue_count == len(fields) else random.sample(fields, clue_count)
-    return {
-        field: tale[field] if field in visible_fields else OBSCURED_CLUES[field]
-        for field in fields
-    }
-
-
-def make_story(a_name, b_name, first_genre, second_genre, difficulty="初級"):
-    """難易度に応じて昔話の特徴を隠し、表示用の文章を作る。"""
+def make_story(a_name, b_name, first_genre, second_genre):
+    """ジャンル物語に、2つの昔話の部品を加えて表示用の文章にする。"""
     a, b = TALES[a_name], TALES[b_name]
-    a_clues = _story_clues(a, ("hero", "helper", "event"), difficulty)
-    b_clues = _story_clues(b, ("item", "place", "ending"), difficulty)
     lines = make_original_story(first_genre, second_genre)
-    lines.insert(2, f"旅の途中で、{a_clues['hero']}と出会い、{b_clues['item']}を託されました。")
-    lines.insert(4, f"{a_clues['helper']}と力を合わせ、{b_clues['place']}へ向かいました。")
-    lines.insert(6, f"そこで、{a_clues['event']}。")
-    lines.insert(8, f"最後には、{b_clues['ending']}。")
+    lines.insert(2, f"旅の途中で、{a['hero']}と出会い、{b['item']}を託されました。")
+    lines.insert(4, f"{a['helper']}と力を合わせ、{b['place']}へ向かいました。")
+    lines.insert(6, f"そこで、{a['event']}。")
+    lines.insert(8, f"最後には、{b['ending']}。")
     return "\n".join(lines)
 
 
@@ -170,43 +144,21 @@ class StoryGame:
         self.total = 0
         self.a_name = ""
         self.b_name = ""
-        self.difficulty = ""
         self.hints = []
         self.used_hints = 0
 
         tk.Label(root, text="AI物語ミックス", font=("Yu Gothic UI", 22, "bold")).pack(
             pady=(15, 2)
         )
-        self.difficulty_frame = tk.Frame(root)
-        self.difficulty_frame.pack(pady=25)
         tk.Label(
-            self.difficulty_frame,
-            text="難易度を選んでください",
-            font=("Yu Gothic UI", 14, "bold"),
-        ).pack(pady=(0, 10))
-        tk.Label(
-            self.difficulty_frame,
-            text="難易度が高いほど、物語に出てくる昔話の特徴が少なくなります。",
-            font=("Yu Gothic UI", 11),
-        ).pack(pady=(0, 12))
-        for difficulty in DIFFICULTY_CLUE_COUNTS:
-            tk.Button(
-                self.difficulty_frame,
-                text=difficulty,
-                width=12,
-                command=lambda selected=difficulty: self.start_game(selected),
-            ).pack(pady=4)
-
-        self.game_frame = tk.Frame(root)
-        tk.Label(
-            self.game_frame,
+            root,
             text="2つのジャンルと2つの昔話を混ぜた物語から、昔話を2つ当ててください",
             font=("Yu Gothic UI", 11),
         ).pack()
-        self.round_label = tk.Label(self.game_frame, font=("Yu Gothic UI", 13, "bold"))
+        self.round_label = tk.Label(root, font=("Yu Gothic UI", 13, "bold"))
         self.round_label.pack(pady=(14, 5))
         self.story_text = tk.Text(
-            self.game_frame,
+            root,
             height=14,
             wrap="word",
             font=("Yu Gothic UI", 12),
@@ -216,10 +168,10 @@ class StoryGame:
         )
         self.story_text.pack(fill="both", expand=True, padx=25)
         tk.Label(
-            self.game_frame, text="混ざっている昔話を2つ選択", font=("Yu Gothic UI", 11, "bold")
+            root, text="混ざっている昔話を2つ選択", font=("Yu Gothic UI", 11, "bold")
         ).pack(pady=(12, 3))
         self.choices = tk.Listbox(
-            self.game_frame,
+            root,
             selectmode=tk.MULTIPLE,
             height=len(NAMES),
             exportselection=False,
@@ -228,11 +180,9 @@ class StoryGame:
         for name in NAMES:
             self.choices.insert(tk.END, name)
         self.choices.pack()
-        self.status_label = tk.Label(
-            self.game_frame, text="", font=("Yu Gothic UI", 11), wraplength=700
-        )
+        self.status_label = tk.Label(root, text="", font=("Yu Gothic UI", 11), wraplength=700)
         self.status_label.pack(pady=8)
-        buttons = tk.Frame(self.game_frame)
+        buttons = tk.Frame(root)
         buttons.pack()
         self.answer_button = tk.Button(buttons, text="答え合わせ", width=13, command=self.check_answer)
         self.answer_button.pack(side="left", padx=4)
@@ -244,11 +194,6 @@ class StoryGame:
             buttons, text="次の問題", width=13, command=self.next_round, state="disabled"
         )
         self.next_button.pack(side="left", padx=4)
-
-    def start_game(self, difficulty):
-        self.difficulty = difficulty
-        self.difficulty_frame.pack_forget()
-        self.game_frame.pack(fill="both", expand=True)
         self.next_round()
 
     def set_story(self, story):
@@ -259,9 +204,7 @@ class StoryGame:
 
     def next_round(self):
         if self.round_no >= self.rounds:
-            self.round_label.config(
-                text=f"{self.difficulty}　ゲーム終了　{self.total} / {self.rounds * 10}点"
-            )
+            self.round_label.config(text=f"ゲーム終了　{self.total} / {self.rounds * 10}点")
             self.set_story("おつかれさまでした！")
             self.status_label.config(text="全問終了です。")
             for button in (self.answer_button, self.hint_button, self.give_up_button):
@@ -274,18 +217,8 @@ class StoryGame:
         first_genre, second_genre = random.sample(GENRE_NAMES, 2)
         self.hints = make_hints(self.a_name, self.b_name)
         self.used_hints = 0
-        self.round_label.config(
-            text=f"{self.difficulty}　第{self.round_no}問　（得点: {self.total}点）"
-        )
-        self.set_story(
-            make_story(
-                self.a_name,
-                self.b_name,
-                first_genre,
-                second_genre,
-                self.difficulty,
-            )
-        )
+        self.round_label.config(text=f"第{self.round_no}問　（得点: {self.total}点）")
+        self.set_story(make_story(self.a_name, self.b_name, first_genre, second_genre))
         self.choices.config(state="normal")
         self.choices.selection_clear(0, tk.END)
         self.status_label.config(text="昔話を2つ選んでください。")
